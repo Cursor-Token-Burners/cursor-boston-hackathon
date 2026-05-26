@@ -1,4 +1,4 @@
-import AthleteCard from "@/components/AthleteCard";
+import AthleteGrid from "@/components/AthleteGrid";
 import { athletes } from "@/data/athletes";
 
 export default function Home() {
@@ -13,14 +13,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section
-        aria-label="Athlete tiles"
-        className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-      >
-        {athletes.map((athlete) => (
-          <AthleteCard key={athlete.id} athlete={athlete} />
-        ))}
-      </section>
+      <AthleteGrid athletes={athletes} />
     </div>
   );
 }

@@ -3,10 +3,10 @@ import type { Athlete } from "@/data/athletes";
 
 export default function AthleteCard({ athlete }: { athlete: Athlete }) {
   return (
-    <article className="group flex flex-col items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="group flex flex-col items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-shadow hover:shadow-md">
       <div className="relative size-24 overflow-hidden rounded-full ring-2 ring-[var(--border)] transition group-hover:ring-[var(--accent)]/50">
         <Image
-          src={`https://i.pravatar.cc/240?img=${athlete.avatarId}`}
+          src={athlete.imageUrl}
           alt={athlete.name}
           fill
           sizes="96px"
@@ -15,9 +15,8 @@ export default function AthleteCard({ athlete }: { athlete: Athlete }) {
       </div>
       <div className="text-center">
         <h3 className="text-sm font-semibold leading-tight">{athlete.name}</h3>
-        <p className="mt-0.5 text-xs text-[var(--muted)]">{athlete.sport}</p>
-        <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--muted)]">
-          {athlete.country}
+        <p className="mt-0.5 text-xs text-[var(--muted)]">
+          {athlete.position} · {athlete.team}
         </p>
       </div>
     </article>
