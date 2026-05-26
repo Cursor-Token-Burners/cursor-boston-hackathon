@@ -3,3 +3,4 @@
 **/venv
 backend/data/
 **/__pycache__
+data/
