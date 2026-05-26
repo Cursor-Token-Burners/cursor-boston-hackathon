@@ -8,3 +8,7 @@ pyjwt
 openai
 pydantic-settings
 email-validator
+python-multipart
+numpy
+opencv-python
+mediapipe
