@@ -25,21 +25,18 @@ export default function RosterBoard({ rosters }: { rosters: Roster[] }) {
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className="grid grid-cols-1 gap-6 md:grid-cols-3"
-    >
+    <div ref={containerRef} className="flex flex-col gap-8">
       {rosters.map((roster) => (
         <section key={roster.sport} className="flex flex-col gap-3">
           <header className="flex items-baseline justify-between border-b border-[var(--border)] pb-2">
             <h2 className="text-lg font-semibold tracking-tight">{roster.sport}</h2>
             <span className="text-xs text-[var(--muted)]">{roster.athletes.length}</span>
           </header>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-row gap-3 overflow-x-auto pb-2">
             {roster.athletes.map((athlete) => (
               <div
                 key={athlete.id}
-                className="athlete-card"
+                className="athlete-card w-64 shrink-0"
                 style={{ transform: "scale(0)" }}
               >
                 <AthleteCard athlete={athlete} />
