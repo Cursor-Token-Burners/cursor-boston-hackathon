@@ -11,8 +11,14 @@ import numpy as np
 from .schemas import VideoInput
 
 
+class VideoAnalysisError(Exception):
+    """Raised when uploaded video content cannot be safely analyzed."""
+
+
 @dataclass(frozen=True)
 class VideoSignals:
+    """Container for extracted movement features and quality metadata."""
+
     analyzed_frames: int
     pose_frames: int
     pose_coverage: float
@@ -34,7 +40,7 @@ class VideoSignals:
 
 
 def _angle_deg(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
-    # Angle ABC at point B.
+    """Compute angle ABC in degrees with B as the vertex."""
     ba = a - b
     bc = c - b
     denom = (np.linalg.norm(ba) * np.linalg.norm(bc)) + 1e-9
@@ -44,6 +50,7 @@ def _angle_deg(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 
 
 def _crop_roi(frame: np.ndarray, vi: VideoInput) -> np.ndarray:
+    """Crop a normalized ROI from the frame; return full frame if ROI is invalid."""
     if vi.roi_x is None or vi.roi_y is None or vi.roi_w is None or vi.roi_h is None:
         return frame
     h, w = frame.shape[:2]
@@ -57,31 +64,39 @@ def _crop_roi(frame: np.ndarray, vi: VideoInput) -> np.ndarray:
 
 
 def analyze_video(path: str, vi: VideoInput) -> VideoSignals:
+    """
+    Extract ACL-relevant movement proxies from a user-selected clip.
+
+    Why these features:
+    - `knee_angle` (hip-knee-ankle angle) approximates sagittal flexion/extension behavior.
+    - `knee_angle_std_deg` captures motion inconsistency, a proxy for guarding/instability.
+    - `knee_abduction_proxy` estimates medial/lateral deviation in 2D; this loosely tracks
+      dynamic valgus patterns associated with ACL risk in jump/landing contexts.
+
+    Important:
+    These are supportive signals only and are never treated as a standalone diagnosis.
+    """
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
-        return VideoSignals(
-            analyzed_frames=0,
-            pose_frames=0,
-            pose_coverage=0.0,
-            mean_knee_angle_deg=None,
-            knee_angle_std_deg=None,
-            mean_knee_abduction_proxy=None,
-            notes=["video_open_failed"],
-        )
+        raise VideoAnalysisError("Could not open uploaded video file.")
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     start_frame = int(max(0, vi.start_sec * fps))
     max_frames = int(max(1, vi.duration_sec * fps))
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-    mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(
-        static_image_mode=False,
-        model_complexity=1,
-        enable_segmentation=False,
-        min_detection_confidence=0.4,
-        min_tracking_confidence=0.4,
-    )
+    try:
+        mp_pose = mp.solutions.pose
+        pose = mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            enable_segmentation=False,
+            min_detection_confidence=0.4,
+            min_tracking_confidence=0.4,
+        )
+    except Exception as exc:
+        cap.release()
+        raise VideoAnalysisError(f"Failed to initialize pose estimator: {exc}") from exc
 
     knee_angles: list[float] = []
     abduction_proxy: list[float] = []
@@ -97,8 +112,17 @@ def analyze_video(path: str, vi: VideoInput) -> VideoSignals:
             analyzed += 1
 
             frame = _crop_roi(frame, vi)
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            res = pose.process(rgb)
+            try:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            except Exception:
+                notes.append("frame_color_conversion_failed")
+                continue
+
+            try:
+                res = pose.process(rgb)
+            except Exception:
+                notes.append("pose_process_failed")
+                continue
             if not res.pose_landmarks:
                 continue
 
@@ -118,14 +142,8 @@ def analyze_video(path: str, vi: VideoInput) -> VideoSignals:
 
             if left_vis >= right_vis:
                 hip, knee, ankle = get(23), get(25), get(27)
-                l_knee = lms[25]
-                l_ank = lms[27]
-                l_hip = lms[23]
             else:
                 hip, knee, ankle = get(24), get(26), get(28)
-                l_knee = lms[26]
-                l_ank = lms[28]
-                l_hip = lms[24]
 
             # Knee flexion proxy angle from 2D points.
             knee_angle = _angle_deg(hip, knee, ankle)
@@ -149,9 +167,9 @@ def analyze_video(path: str, vi: VideoInput) -> VideoSignals:
         pose.close()
 
     if analyzed == 0:
-        notes.append("no_frames_analyzed")
+        raise VideoAnalysisError("No frames were readable from uploaded video.")
     if pose_ok == 0:
-        notes.append("no_pose_detected")
+        raise VideoAnalysisError("No valid body pose detected in selected clip/ROI.")
 
     if len(knee_angles) >= 5:
         mean_angle = float(np.mean(knee_angles))

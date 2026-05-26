@@ -7,6 +7,8 @@ from .schemas import ACLTextIntake, SeverityBand, Urgency
 
 @dataclass(frozen=True)
 class TriageResult:
+    """Normalized text-only triage result before video fusion."""
+
     severity_band: SeverityBand
     urgency: Urgency
     confidence: float
@@ -17,8 +19,11 @@ class TriageResult:
 
 def triage_from_text(intake: ACLTextIntake) -> TriageResult:
     """
-    Safety-first ACL triage rubric.
-    This is not diagnosis; it's a conservative urgency recommendation.
+    Compute ACL concern and urgency from structured symptom intake.
+
+    The scoring intentionally over-weights known ACL pattern signals:
+    pivot/twist mechanism, audible pop, rapid swelling, and instability.
+    This favors patient safety by reducing false reassurance in uncertain cases.
     """
     red_flags: list[str] = []
     rationale: list[str] = []

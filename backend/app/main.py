@@ -4,13 +4,12 @@ import os
 import tempfile
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
+from .acl_service import ACLServiceError, combine_text_video_acl
 from .schemas import ACLAnalysisResponse, ACLTextIntake, VideoInput
-from .triage import triage_from_text
-from .video import analyze_video
 
 app = FastAPI(title="ACL Video+Text Triage API", version="0.1.0")
 
@@ -25,6 +24,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
+    """Simple process health probe used by frontend and deployment checks."""
     return {"ok": True}
 
 
@@ -35,88 +35,77 @@ async def analyze_acl(
     video_input_json: Optional[str] = Form(None),
 ) -> ACLAnalysisResponse:
     """
-    Analyze ACL concern from:
-    - structured text intake JSON
-    - a short user-selected clip (video)
+    Analyze ACL concern from structured text + user-selected video clip.
+
+    Request form fields:
+    - `video`: binary upload for movement analysis.
+    - `text_intake_json`: serialized `ACLTextIntake` JSON payload.
+    - `video_input_json`: optional serialized `VideoInput` JSON payload.
+
+    Response:
+    A structured severity/urgency decision with confidence, rationale, and
+    extracted pose-derived movement signals.
     """
     try:
         intake = ACLTextIntake.model_validate_json(text_intake_json)
     except ValidationError as e:
-        return ACLAnalysisResponse(
-            severity_band="insufficient_evidence",
-            urgency="see_clinician_soon",
-            confidence_0_1=0.2,
-            red_flags=["invalid_text_intake_json"],
-            rationale_bullets=[str(e)],
-            next_steps=["Fix the intake JSON and retry."],
-            extracted_video_signals={},
-        )
+        raise HTTPException(status_code=422, detail=f"Invalid text_intake_json: {e}") from e
 
     if video_input_json:
         try:
             vi = VideoInput.model_validate_json(video_input_json)
-        except ValidationError:
-            vi = VideoInput()
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=f"Invalid video_input_json: {e}") from e
     else:
         vi = VideoInput()
 
-    # Save upload to a temporary file for OpenCV/MediaPipe.
-    suffix = os.path.splitext(video.filename or "")[1] or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp_path = tmp.name
-        content = await video.read()
-        tmp.write(content)
+    filename = video.filename or "upload.mp4"
+    if not filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".webm")):
+        raise HTTPException(status_code=415, detail="Unsupported video format. Use mp4/mov/avi/mkv/webm.")
 
     try:
-        text_triage = triage_from_text(intake)
-        vid = analyze_video(tmp_path, vi)
+        content = await video.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read uploaded file: {e}") from e
 
-        rationale = list(text_triage.rationale)
-        next_steps = list(text_triage.next_steps)
-        red_flags = list(text_triage.red_flags)
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded video file is empty.")
 
-        # If video quality is too low, reduce confidence and avoid overclaiming.
-        confidence = text_triage.confidence
-        if vid.pose_coverage < 0.35:
-            confidence = max(0.35, confidence - 0.2)
-            rationale.append("Video pose tracking was low-confidence; recommendations rely mostly on the text intake.")
+    # 200 MB guardrail for local hackathon runtime.
+    if len(content) > 200 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Uploaded video too large; please keep under 200MB.")
 
-        # Heuristic: high variability in knee angle can reflect instability/limping/movement inconsistency
-        # (camera-dependent, not diagnostic).
-        if vid.knee_angle_std_deg is not None and vid.knee_angle_std_deg > 18:
-            rationale.append("Video shows inconsistent knee motion (high variability), which can happen with guarding or instability.")
-            if text_triage.severity_band in ("low_acl_concern", "insufficient_evidence"):
-                # Only mild escalation; keep conservative.
-                severity_band = "moderate_acl_concern"
-            else:
-                severity_band = text_triage.severity_band
-            urgency = text_triage.urgency
-            confidence = min(0.85, confidence + 0.05)
-        else:
-            severity_band = text_triage.severity_band
-            urgency = text_triage.urgency
+    suffix = os.path.splitext(filename)[1] or ".mp4"
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            tmp.write(content)
 
-        # If the user reports buckling + classic pattern, push urgency higher.
-        if intake.instability_giving_way is True and severity_band == "high_acl_concern":
-            urgency = "ortho_or_sports_med_soon"
-
-        # Emergency escalation only on very strong red flags in this simplified MVP.
-        if intake.weight_bearing == "unable" and intake.pain_0_10 is not None and intake.pain_0_10 >= 8:
-            urgency = "emergency_now"
-            rationale.append("Severe pain with inability to bear weight warrants urgent evaluation.")
-
+        result = combine_text_video_acl(intake=intake, video_path=tmp_path, video_input=vi)
         return ACLAnalysisResponse(
-            severity_band=severity_band,
-            urgency=urgency,
-            confidence_0_1=float(max(0.0, min(1.0, confidence))),
-            red_flags=red_flags,
-            rationale_bullets=rationale[:10],
-            next_steps=next_steps[:10],
-            extracted_video_signals=vid.as_dict(),
+            severity_band=result.severity_band,
+            urgency=result.urgency,
+            confidence_0_1=result.confidence_0_1,
+            red_flags=result.red_flags,
+            rationale_bullets=result.rationale_bullets,
+            next_steps=result.next_steps,
+            extracted_video_signals={
+                **result.extracted_video_signals,
+                "rag_context": result.rag_context,
+            },
         )
+    except ACLServiceError as e:
+        # Corrupt videos, no detectable person, and retrieval misses are surfaced clearly.
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected ACL analysis failure: {e}") from e
     finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 

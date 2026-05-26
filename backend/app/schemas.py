@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 
 class ACLTextIntake(BaseModel):
+    """Structured symptom input used for ACL triage scoring."""
+
     # Keep this small and structured; free-text can live in `notes`.
     mechanism: Optional[Literal["pivot_twist", "contact", "noncontact_jump", "unknown"]] = None
     heard_pop: Optional[bool] = None
@@ -19,6 +21,8 @@ class ACLTextIntake(BaseModel):
 
 
 class VideoInput(BaseModel):
+    """Video analysis window and optional person ROI configuration."""
+
     # Seconds into the video to start analyzing (user-selected).
     start_sec: float = Field(default=0, ge=0)
     # Duration analyzed in seconds.
@@ -36,6 +40,8 @@ Urgency = Literal["self_care", "see_clinician_soon", "ortho_or_sports_med_soon",
 
 
 class ACLAnalysisResponse(BaseModel):
+    """Final API payload returned to frontend after text+video fusion."""
+
     severity_band: SeverityBand
     urgency: Urgency
     confidence_0_1: float = Field(ge=0, le=1)
