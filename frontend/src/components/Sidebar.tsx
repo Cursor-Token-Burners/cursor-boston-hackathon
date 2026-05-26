@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Activity,
+  Camera,
   CalendarDays,
   ChevronLeft,
   LayoutDashboard,
@@ -15,17 +18,18 @@ import {
 type NavItem = {
   label: string;
   icon: LucideIcon;
-  active?: boolean;
+  href: string;
 };
 
 const nav: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Athletes", icon: Users, active: true },
-  { label: "Teams", icon: Trophy },
-  { label: "Schedule", icon: CalendarDays },
-  { label: "Training Plans", icon: Activity },
-  { label: "Performance Stats", icon: LineChart },
-  { label: "Messages", icon: MessageSquare },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { label: "Athletes", icon: Users, href: "/dashboard" },
+  { label: "ACL Analyzer", icon: Camera, href: "/acl-analyzer" },
+  { label: "Teams", icon: Trophy, href: "/dashboard" },
+  { label: "Schedule", icon: CalendarDays, href: "/dashboard" },
+  { label: "Training Plans", icon: Activity, href: "/dashboard" },
+  { label: "Performance Stats", icon: LineChart, href: "/dashboard" },
+  { label: "Messages", icon: MessageSquare, href: "/dashboard" },
 ];
 
 export default function Sidebar({
@@ -35,6 +39,7 @@ export default function Sidebar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const pathname = usePathname();
   return (
     <aside
       aria-label="Primary"
@@ -45,10 +50,12 @@ export default function Sidebar({
       <div className="flex h-full flex-col">
         <nav className="flex-1 overflow-y-auto px-2 py-4">
           <ul className="flex flex-col gap-1">
-            {nav.map(({ label, icon: Icon, active }) => (
+            {nav.map(({ label, icon: Icon, href }) => {
+              const active = pathname === href;
+              return (
               <li key={label}>
-                <a
-                  href="#"
+                <Link
+                  href={href}
                   title={collapsed ? label : undefined}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                     active
@@ -64,9 +71,10 @@ export default function Sidebar({
                   >
                     {label}
                   </span>
-                </a>
+                </Link>
               </li>
-            ))}
+            );
+            })}
           </ul>
         </nav>
 
