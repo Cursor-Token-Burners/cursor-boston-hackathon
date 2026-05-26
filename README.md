@@ -1,4 +1,4 @@
-# cursor-boston-hackathon
+# FieldBack
 
 ## Problem
 
