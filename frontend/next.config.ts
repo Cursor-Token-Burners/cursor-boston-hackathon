@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "upload.wikimedia.org" },
-    ],
-  },
+  // Keep config minimal for hackathon reliability.
 };
 
 export default nextConfig;

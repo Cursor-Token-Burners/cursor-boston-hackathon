@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 type Mechanism = "pivot_twist" | "contact" | "noncontact_jump" | "unknown";
 type WeightBearing = "normal" | "painful" | "unable";
 
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
+const DEFAULT_BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
 
 export default function AclAnalyzerPage() {
   const [backendUrl, setBackendUrl] = useState(DEFAULT_BACKEND_URL);
@@ -80,14 +81,24 @@ export default function AclAnalyzerPage() {
       form.append("text_intake_json", intakeJson);
       form.append("video_input_json", videoInputJson);
 
-      const res = await fetch(`${backendUrl}/analyze/acl`, {
+      const normalized = backendUrl.replace(/\/+$/, "");
+      const res = await fetch(`${normalized}/analyze/acl`, {
         method: "POST",
         body: form,
       });
 
       const text = await res.text();
       if (!res.ok) {
-        setError(`Backend error ${res.status}: ${text}`);
+        try {
+          const parsed = JSON.parse(text);
+          const detail =
+            typeof parsed?.detail === "string"
+              ? parsed.detail
+              : JSON.stringify(parsed);
+          setError(`Backend error ${res.status}: ${detail}`);
+        } catch {
+          setError(`Backend error ${res.status}: ${text}`);
+        }
         return;
       }
 
