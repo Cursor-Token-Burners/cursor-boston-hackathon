@@ -108,6 +108,28 @@ uvicorn app.main:app --reload --port 8000
 ```
 Backend health: `http://127.0.0.1:8000/health`
 
+## Quick test (exact payload to use)
+
+1. Start backend and frontend (commands above).
+2. Use a short local video (5-15s, single person clearly visible), e.g. `sample.mp4`.
+3. Call the backend:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/analyze/acl" ^
+  -F "video=@sample.mp4" ^
+  -F "text_intake_json={\"mechanism\":\"pivot_twist\",\"heard_pop\":true,\"immediate_swelling_within_2h\":true,\"instability_giving_way\":true,\"weight_bearing\":\"painful\",\"pain_0_10\":7}" ^
+  -F "video_input_json={\"start_sec\":0,\"duration_sec\":8}"
+```
+
+Expected:
+- HTTP 200 JSON response
+- fields: `severity_band`, `urgency`, `confidence_0_1`, `rationale_bullets`, `extracted_video_signals`
+
+If you get an error:
+- 415: unsupported file extension
+- 422: invalid JSON, unreadable video, or no detectable pose in clip
+- 413: file too large
+
 ## Evaluation benchmarks (for judging)
 
 - **Urgency classification**: macro-F1 + high-risk recall
@@ -122,5 +144,19 @@ Backend health: `http://127.0.0.1:8000/health`
   [https://www.nature.com/articles/s41597-025-05934-5](https://www.nature.com/articles/s41597-025-05934-5)
 - Open-access mirror:  
   [https://pmc.ncbi.nlm.nih.gov/articles/PMC12528683/](https://pmc.ncbi.nlm.nih.gov/articles/PMC12528683/)
+
+Downloaded local path in this workspace:
+- `data/acl_jump_dataset`
+
+Current downloaded sample files:
+- `ACL_questionnaires.xlsx`
+- `participant_log.xlsx`
+- `figshare_manifest.json`
+
+To fetch more files from the same dataset:
+
+```bash
+python .\scripts\download_acl_figshare_dataset.py --out .\data\acl_jump_dataset --max-files 50
+```
 
 You can also collect controlled phone videos (walk, single-leg stance, shallow squat) for consistent local testing.

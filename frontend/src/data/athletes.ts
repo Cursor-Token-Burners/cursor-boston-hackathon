@@ -11,11 +11,11 @@ export type Roster = {
 };
 
 const IMAGE_POOL = [
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Patrick_Mahomes_%2851615475056%29.jpg/330px-Patrick_Mahomes_%2851615475056%29.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Travis_Kelce_in_the_Oval_Office_of_the_White_House_on_June_5%2C_2023_-_P20230605AS-0902_%28cropped%29.jpg/330px-Travis_Kelce_in_the_Oval_Office_of_the_White_House_on_June_5%2C_2023_-_P20230605AS-0902_%28cropped%29.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/149th_Preakness_%2853731145142%29_%28cropped%29.jpg/330px-149th_Preakness_%2853731145142%29_%28cropped%29.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Josh_Allen_SEPT2021_%28cropped2%29.jpg/330px-Josh_Allen_SEPT2021_%28cropped2%29.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Jefferson_2022.jpg/330px-Jefferson_2022.jpg",
+  "/avatar-placeholder.svg",
+  "/avatar-placeholder.svg",
+  "/avatar-placeholder.svg",
+  "/avatar-placeholder.svg",
+  "/avatar-placeholder.svg",
 ];
 
 export const rosters: Roster[] = [
