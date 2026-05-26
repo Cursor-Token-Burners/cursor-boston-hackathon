@@ -32,7 +32,7 @@ export default function RosterBoard({ rosters }: { rosters: Roster[] }) {
             <h2 className="text-lg font-semibold tracking-tight">{roster.sport}</h2>
             <span className="text-xs text-[var(--muted)]">{roster.athletes.length}</span>
           </header>
-          <div className="flex flex-row gap-3 overflow-x-auto pb-2">
+          <div className="flex flex-wrap gap-3">
             {roster.athletes.map((athlete) => (
               <div
                 key={athlete.id}
