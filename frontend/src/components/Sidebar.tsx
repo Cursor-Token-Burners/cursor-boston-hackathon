@@ -7,10 +7,8 @@ import {
   LayoutDashboard,
   LineChart,
   MessageSquare,
-  Settings,
   Trophy,
   Users,
-  Utensils,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,9 +25,7 @@ const nav: NavItem[] = [
   { label: "Schedule", icon: CalendarDays },
   { label: "Training Plans", icon: Activity },
   { label: "Performance Stats", icon: LineChart },
-  { label: "Nutrition", icon: Utensils },
   { label: "Messages", icon: MessageSquare },
-  { label: "Settings", icon: Settings },
 ];
 
 export default function Sidebar({
