@@ -91,6 +91,7 @@ export default function CheckinPage() {
         <div className="mb-6 flex justify-end">
           <button
             type="button"
+            data-tour="checkin-logout"
             onClick={() => router.push("/")}
             className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
           >
@@ -121,6 +122,7 @@ export default function CheckinPage() {
             <textarea
               id="symptoms"
               ref={textareaRef}
+              data-tour="symptoms"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. my thighs hurt after practice, kind of a dull ache"
@@ -145,6 +147,7 @@ export default function CheckinPage() {
                   <button
                     key={part}
                     type="button"
+                    data-tour={part === "Knee" ? "body-knee" : undefined}
                     onClick={() => togglePart(part)}
                     className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
                       active
@@ -254,6 +257,7 @@ export default function CheckinPage() {
             </p>
             <button
               type="submit"
+              data-tour="send-checkin"
               disabled={!canSubmit}
               className="rounded-xl bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -270,7 +274,10 @@ export default function CheckinPage() {
 function ResultCard({ result, onReset }: { result: Result; onReset: () => void }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+      <div
+        data-tour="checkin-result"
+        className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5"
+      >
         <div className="mb-3 flex items-center gap-2">
           <span className="inline-block size-2 rounded-full bg-[var(--accent)]" />
           <h2 className="text-sm font-semibold tracking-tight">

@@ -17,31 +17,87 @@ type Stage = {
 };
 
 /**
- * The coach journey, in order. Click stages highlight exactly the element
- * the visitor must click; the click itself advances the tour.
+ * The full journey in story order — file a pain report as an athlete, then
+ * flip to the coach side and see the roster-wide picture. Click stages
+ * highlight exactly the element the visitor must click; the click itself
+ * advances the tour.
  */
 const STAGES: Stage[] = [
+  // ——— Athlete side ———
+  {
+    selector: '[data-tour="role-athlete"]',
+    title: "1 · Start as an athlete",
+    description:
+      "No account needed. Click the Athlete card — this is what a player opens on their phone after practice.",
+    side: "bottom",
+    advance: "click",
+    waitMs: 10_000,
+  },
+  {
+    selector: '[data-tour="symptoms"]',
+    title: "2 · Say it in plain words",
+    description:
+      "No medical vocabulary. \u201cMy knee feels wobbly on stairs\u201d is exactly the kind of input this is built for.",
+    side: "bottom",
+    advance: "next",
+    waitMs: 15_000,
+  },
+  {
+    selector: '[data-tour="body-knee"]',
+    title: "3 · Tap where it hurts",
+    description: "Click Knee to mark the spot.",
+    side: "top",
+    advance: "click",
+    waitMs: 10_000,
+  },
+  {
+    selector: '[data-tour="send-checkin"]',
+    title: "4 · Send it to your trainer",
+    description:
+      "Click Send. The report lands on the coach's dashboard — which is where we're headed next.",
+    side: "top",
+    advance: "click",
+    waitMs: 10_000,
+  },
+  {
+    selector: '[data-tour="checkin-result"]',
+    title: "5 · Structured, instantly",
+    description:
+      "The free-text answer is parsed into areas, pain level, and onset — the shape the triage model consumes.",
+    side: "bottom",
+    advance: "next",
+    waitMs: 10_000,
+  },
+  {
+    selector: '[data-tour="checkin-logout"]',
+    title: "6 · Now switch sides",
+    description: "Click Log out to head back and see what the coach sees.",
+    side: "bottom",
+    advance: "click",
+    waitMs: 10_000,
+  },
+  // ——— Coach side ———
   {
     selector: '[data-tour="role-coach"]',
-    title: "1 · Enter as a coach",
+    title: "7 · Enter as the coach",
     description:
-      "No account needed. Click the Coach card to open the dashboard a trainer would see every morning.",
+      "Click the Coach card to open the dashboard a trainer would see every morning.",
     side: "bottom",
     advance: "click",
     waitMs: 10_000,
   },
   {
     selector: '[data-tour="roster"]',
-    title: "2 · The whole roster at a glance",
+    title: "8 · The whole roster at a glance",
     description:
-      "Every athlete across Football, Soccer, and Swimming. In the real product, cards surface who reported pain overnight so the trainer knows where to look first.",
+      "Every athlete across Football, Soccer, and Swimming. In the real product, cards surface who reported pain overnight — like the check-in you just filed.",
     side: "top",
     advance: "next",
     waitMs: 15_000,
   },
   {
     selector: '[data-tour="athlete-card"]',
-    title: "3 · Open an athlete",
+    title: "9 · Open an athlete",
     description: "Click this athlete to drill into their profile.",
     side: "bottom",
     advance: "click",
@@ -49,7 +105,7 @@ const STAGES: Stage[] = [
   },
   {
     selector: '[data-tour="silhouette"]',
-    title: "4 · A body built from measurements",
+    title: "10 · A body built from measurements",
     description:
       "This low-poly 3D silhouette is generated directly from the athlete's real measurements — height, shoulder width, chest, waist, hip. Drag to rotate it.",
     side: "right",
@@ -58,7 +114,7 @@ const STAGES: Stage[] = [
   },
   {
     selector: '[data-tour="stats"]',
-    title: "5 · The numbers behind the mesh",
+    title: "11 · The numbers behind the mesh",
     description:
       "Body and performance metrics feed the silhouette and, in the full product, the injury-risk triage model.",
     side: "left",
@@ -206,7 +262,7 @@ export default function DemoTour() {
         popover: {
           title: "👋 This is FieldBack",
           description:
-            "A Cursor Boston Sports Hack build: injury triage for team sports. Athletes log pain in plain words, coaches watch the roster. Follow the highlights — when a button glows, click it.",
+            "A Cursor Boston Sports Hack build: injury triage for team sports. You'll play both sides — first file a pain report as an athlete, then flip to the coach dashboard to see the roster-wide picture. When a button glows, click it.",
           showButtons: ["next", "close"],
           nextBtnText: "Show me →",
           onNextClick: () => {
@@ -288,9 +344,9 @@ export default function DemoTour() {
       // Finale — closed by the visitor.
       d.highlight({
         popover: {
-          title: "🎉 That's the coach side",
+          title: "🎉 That's the whole loop",
           description:
-            "There's a second half: head back to the landing page and enter as an Athlete to file a plain-language pain check-in. Everything you saw is live — poke around.",
+            "Athlete says what hurts in plain words → report lands structured → coach sees the roster and drills into any body. Everything you saw is live — poke around.",
           showButtons: ["close"],
         },
       });
