@@ -33,6 +33,10 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   font-family: var(--font-sans), system-ui, sans-serif;
   max-width: 320px;
+  /* Safety net: never allow the popover to be stuck invisible if the
+     fade animation fails to run (throttled tabs, reduced motion, etc.). */
+  animation: none !important;
+  opacity: 1 !important;
 }
 .fb-tour .driver-popover-title {
   font-size: 15px;

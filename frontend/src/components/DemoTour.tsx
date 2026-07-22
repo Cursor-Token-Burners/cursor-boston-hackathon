@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { driver, type Driver, type AllowedButtons } from "driver.js";
+import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
-
-const SEEN_KEY = "fb_tour_seen_v1";
 
 type Stage = {
   selector: string;
@@ -69,24 +67,49 @@ const STAGES: Stage[] = [
   },
 ];
 
-function waitForElement(
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * driver.js draws its overlay/stage inside requestAnimationFrame callbacks.
+ * Some embedded or throttled browsers never fire rAF for background tabs
+ * (or at all), which leaves the tour invisible: popover at opacity 0 and no
+ * overlay. Probe once; if rAF is dead, replace it with a setTimeout shim.
+ */
+let rafProbed = false;
+function ensureWorkingRaf() {
+  if (rafProbed) return;
+  rafProbed = true;
+  let fired = false;
+  window.requestAnimationFrame(() => {
+    fired = true;
+  });
+  setTimeout(() => {
+    if (fired) return;
+    window.requestAnimationFrame = ((cb: FrameRequestCallback) =>
+      window.setTimeout(
+        () => cb(performance.now()),
+        16,
+      )) as typeof window.requestAnimationFrame;
+    window.cancelAnimationFrame = ((id: number) =>
+      window.clearTimeout(id)) as typeof window.cancelAnimationFrame;
+  }, 300);
+}
+
+async function waitForElement(
   selector: string,
   timeoutMs: number,
   isCancelled: () => boolean,
 ): Promise<HTMLElement | null> {
-  return new Promise((resolve) => {
-    const started = Date.now();
-    const tick = () => {
-      if (isCancelled()) return resolve(null);
-      const el = document.querySelector<HTMLElement>(selector);
-      if (el) return resolve(el);
-      if (Date.now() - started > timeoutMs) return resolve(null);
-      setTimeout(tick, 150);
-    };
-    tick();
-  });
+  const started = Date.now();
+  while (!isCancelled() && Date.now() - started < timeoutMs) {
+    const el = document.querySelector<HTMLElement>(selector);
+    if (el) return el;
+    await sleep(150);
+  }
+  return null;
 }
 
+/** Resolves true when the element is clicked, false on cancel/removal. */
 function waitForClick(
   el: HTMLElement,
   isCancelled: () => boolean,
@@ -112,68 +135,103 @@ function waitForClick(
 
 export default function DemoTour() {
   const runningRef = useRef(false);
-  const cancelledRef = useRef(false);
   const driverRef = useRef<Driver | null>(null);
-  // Set while we tear a driver down ourselves, so onDestroyed can tell a
-  // user-initiated close (Esc / ✕ / overlay) from our own stage transitions.
-  const internalDestroyRef = useRef(false);
-
-  const makeDriver = useCallback(
-    () =>
-      driver({
-        showProgress: false,
-        allowKeyboardControl: true,
-        overlayOpacity: 0.55,
-        stagePadding: 6,
-        stageRadius: 12,
-        popoverClass: "fb-tour",
-        disableActiveInteraction: false,
-        onDestroyed: () => {
-          if (!internalDestroyRef.current) cancelledRef.current = true;
-        },
-      }),
-    [],
-  );
-
-  const destroyCurrent = useCallback(() => {
-    internalDestroyRef.current = true;
-    driverRef.current?.destroy();
-    internalDestroyRef.current = false;
-    driverRef.current = null;
-  }, []);
+  const cancelRunRef = useRef<(() => void) | null>(null);
 
   const startTour = useCallback(async () => {
-    if (runningRef.current) return;
+    // A second invocation cancels the in-flight run and restarts from the
+    // top, so programmatic restarts always work.
+    if (runningRef.current) {
+      cancelRunRef.current?.();
+      const waitStart = Date.now();
+      while (runningRef.current && Date.now() - waitStart < 3_000) {
+        await sleep(50);
+      }
+      if (runningRef.current) return;
+    }
     runningRef.current = true;
-    cancelledRef.current = false;
-    const isCancelled = () => cancelledRef.current;
+
+    // One driver instance for the whole run. Cancellation (Esc / ✕) is
+    // detected by polling `isActive()` — driver.js resets that state
+    // synchronously on destroy, unlike the onDestroyed hook which can be
+    // skipped depending on animation timing.
+    let internalDestroy = false;
+    let externallyDestroyed = false;
+
+    const d = driver({
+      showProgress: false,
+      allowKeyboardControl: true,
+      // No fade animation: driver's fade leaves the popover at opacity 0
+      // until the CSS animation completes, which can never happen in
+      // throttled/background tabs. Synchronous rendering is bulletproof.
+      animate: false,
+      overlayOpacity: 0.55,
+      stagePadding: 6,
+      stageRadius: 12,
+      popoverClass: "fb-tour",
+      // A stray click on the dark overlay must NOT kill the tour — visitors
+      // click around while exploring. Close stays available via ✕ and Esc.
+      overlayClickBehavior: () => {},
+      // The highlighted element stays clickable; everything else is blocked
+      // by the overlay.
+      disableActiveInteraction: false,
+      onDestroyed: () => {
+        if (!internalDestroy) externallyDestroyed = true;
+      },
+    });
+    driverRef.current = d;
+    const isCancelled = () => externallyDestroyed || !d.isActive();
+    cancelRunRef.current = () => {
+      externallyDestroyed = true;
+      internalDestroy = true;
+      d.destroy();
+      internalDestroy = false;
+    };
+
+    const finish = () => {
+      if (d.isActive()) {
+        internalDestroy = true;
+        d.destroy();
+        internalDestroy = false;
+      }
+      cancelRunRef.current = null;
+      driverRef.current = null;
+      runningRef.current = false;
+    };
 
     try {
-      // Intro card.
-      const introDone = await new Promise<boolean>((resolve) => {
-        const d = makeDriver();
-        driverRef.current = d;
-        d.highlight({
-          popover: {
-            title: "👋 This is FieldBack",
-            description:
-              "A Cursor Boston Sports Hack build: injury triage for team sports. Athletes log pain in plain words, coaches watch the roster. Follow the highlights — when a button glows, click it.",
-            showButtons: ["next", "close"] as AllowedButtons[],
-            nextBtnText: "Show me →",
-            onNextClick: () => resolve(true),
+      // Intro card — advanced by its own button.
+      let introNext = false;
+      d.highlight({
+        popover: {
+          title: "👋 This is FieldBack",
+          description:
+            "A Cursor Boston Sports Hack build: injury triage for team sports. Athletes log pain in plain words, coaches watch the roster. Follow the highlights — when a button glows, click it.",
+          showButtons: ["next", "close"],
+          nextBtnText: "Show me →",
+          onNextClick: () => {
+            introNext = true;
           },
-        });
-        const poll = setInterval(() => {
-          if (cancelledRef.current) {
-            clearInterval(poll);
-            resolve(false);
-          }
-        }, 200);
+        },
       });
-      destroyCurrent();
-      if (!introDone || isCancelled()) return;
+      while (!introNext && !isCancelled()) await sleep(100);
+      if (isCancelled()) return;
 
       for (const stage of STAGES) {
+        // If the next target isn't in the DOM yet (page transition, data
+        // loading), show a neutral waiting card instead of leaving the
+        // previous popover anchored to a removed element.
+        if (!document.querySelector(stage.selector)) {
+          d.highlight({
+            popover: {
+              title: "⏳ One moment",
+              description:
+                "The next step lights up automatically as soon as it's ready.",
+              showButtons: ["close"],
+            },
+          });
+        }
+
         const el = await waitForElement(
           stage.selector,
           stage.waitMs ?? 10_000,
@@ -184,105 +242,82 @@ export default function DemoTour() {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
 
         if (stage.advance === "next") {
-          const nextDone = await new Promise<boolean>((resolve) => {
-            const d = makeDriver();
-            driverRef.current = d;
-            d.highlight({
-              element: el,
-              popover: {
-                title: stage.title,
-                description: stage.description,
-                side: stage.side,
-                showButtons: ["next", "close"] as AllowedButtons[],
-                nextBtnText: "Next →",
-                onNextClick: () => resolve(true),
-              },
-            });
-            const poll = setInterval(() => {
-              if (cancelledRef.current) {
-                clearInterval(poll);
-                resolve(false);
-              }
-            }, 200);
-          });
-          destroyCurrent();
-          if (!nextDone || isCancelled()) return;
-        } else {
-          const d = makeDriver();
-          driverRef.current = d;
+          let nextDone = false;
           d.highlight({
             element: el,
             popover: {
               title: stage.title,
               description: stage.description,
               side: stage.side,
-              showButtons: ["close"] as AllowedButtons[],
+              showButtons: ["next", "close"],
+              nextBtnText: "Next →",
+              onNextClick: () => {
+                nextDone = true;
+              },
             },
           });
+          // Keep the cutout glued to targets in shifting layouts.
+          const refreshTimer = setInterval(() => {
+            if (d.isActive() && el.isConnected) d.refresh();
+          }, 250);
+          while (!nextDone && !isCancelled() && el.isConnected)
+            await sleep(100);
+          clearInterval(refreshTimer);
+          if (!nextDone || isCancelled()) return;
+        } else {
+          d.highlight({
+            element: el,
+            popover: {
+              title: stage.title,
+              description: stage.description,
+              side: stage.side,
+              showButtons: ["close"],
+            },
+          });
+          // driver.js only repositions on window scroll/resize. Targets can
+          // move as data streams in, so poll and refresh.
+          const refreshTimer = setInterval(() => {
+            if (d.isActive() && el.isConnected) d.refresh();
+          }, 250);
           const clicked = await waitForClick(el, isCancelled);
-          destroyCurrent();
+          clearInterval(refreshTimer);
           if (!clicked || isCancelled()) return;
         }
       }
 
-      // Finale.
-      const d = makeDriver();
-      driverRef.current = d;
+      // Finale — closed by the visitor.
       d.highlight({
         popover: {
           title: "🎉 That's the coach side",
           description:
-            "There's a second half: log out (top-right menu) and enter as an Athlete to file a plain-language pain check-in. Replay this tour anytime with the Tour button, bottom-left.",
-          showButtons: ["close"] as AllowedButtons[],
+            "There's a second half: head back to the landing page and enter as an Athlete to file a plain-language pain check-in. Everything you saw is live — poke around.",
+          showButtons: ["close"],
         },
       });
+      while (!isCancelled()) await sleep(200);
     } finally {
-      runningRef.current = false;
+      finish();
     }
-  }, [destroyCurrent, makeDriver]);
+  }, []);
 
-  // Auto-start once per visitor, only from the landing page so the
-  // journey begins at step one. `?tour=1` (set by the replay button)
-  // forces a start regardless of the seen flag.
+  // Autoplay on every landing-page load — the tour IS the demo's front door.
+  // Visitors who already know the flow can dismiss it with ✕ or Esc.
   useEffect(() => {
-    try {
-      const forced = new URLSearchParams(window.location.search).has("tour");
-      if (window.location.pathname !== "/") return;
-      if (!forced && localStorage.getItem(SEEN_KEY)) return;
-      localStorage.setItem(SEEN_KEY, "1");
-    } catch {
-      return;
-    }
+    // Probe rAF immediately so a dead implementation is shimmed before the
+    // first highlight renders (probe resolves in 300ms, tour starts at 800ms).
+    ensureWorkingRaf();
+    if (window.location.pathname !== "/") return;
     const t = setTimeout(() => void startTour(), 800);
     return () => clearTimeout(t);
   }, [startTour]);
 
+  // Tear down on unmount.
   useEffect(() => {
     return () => {
-      cancelledRef.current = true;
-      destroyCurrent();
+      cancelRunRef.current?.();
+      driverRef.current = null;
     };
-  }, [destroyCurrent]);
+  }, []);
 
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        // Restart the journey from the landing page if we're mid-app.
-        if (window.location.pathname !== "/") {
-          window.location.href = "/?tour=1";
-          return;
-        }
-        void startTour();
-      }}
-      aria-label="Replay the guided tour"
-      title="What is this? Take the tour"
-      className="fixed bottom-5 left-5 z-40 flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[12px] font-semibold shadow-lg transition-colors hover:border-[var(--accent)]"
-    >
-      <span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--accent)] font-mono text-[11px] font-bold text-white">
-        ?
-      </span>
-      Tour
-    </button>
-  );
+  return null;
 }
