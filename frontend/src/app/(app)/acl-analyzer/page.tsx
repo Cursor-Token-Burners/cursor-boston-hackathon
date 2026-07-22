@@ -122,6 +122,14 @@ export default function AclAnalyzerPage() {
         <p className="mt-1 text-sm text-[var(--muted)]">
           Upload a short clip and structured intake. This is decision support, not a diagnosis.
         </p>
+        <p className="mt-3 rounded-lg border border-dashed border-[var(--accent)]/40 bg-[var(--accent)]/5 px-3 py-2 text-xs leading-relaxed text-[var(--muted)]">
+          <span className="font-semibold text-[var(--accent)]">Heads up:</span>{" "}
+          the analysis model (MediaPipe pose extraction + RAG-grounded rehab
+          retrieval) runs in a local Python backend that is not deployed with
+          this demo. To try it, clone the repo and run the backend, then point
+          the Backend URL below at it. Requests go straight from your browser
+          to that URL — nothing is sent to this site.
+        </p>
       </header>
 
       <form
