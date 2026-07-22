@@ -25,3 +25,35 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* driver.js guided-tour popover */
+.fb-tour.driver-popover {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  max-width: 320px;
+}
+.fb-tour .driver-popover-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.fb-tour .driver-popover-description {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.fb-tour .driver-popover-next-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 600;
+  text-shadow: none;
+}
+.fb-tour .driver-popover-next-btn:hover {
+  background: var(--accent);
+  opacity: 0.9;
+}

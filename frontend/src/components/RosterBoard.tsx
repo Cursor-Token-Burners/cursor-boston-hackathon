@@ -25,17 +25,20 @@ export default function RosterBoard({ rosters }: { rosters: Roster[] }) {
   }, []);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-8">
-      {rosters.map((roster) => (
+    <div ref={containerRef} data-tour="roster" className="flex flex-col gap-8">
+      {rosters.map((roster, rosterIdx) => (
         <section key={roster.sport} className="flex flex-col gap-3">
           <header className="flex items-baseline justify-between border-b border-[var(--border)] pb-2">
             <h2 className="text-lg font-semibold tracking-tight">{roster.sport}</h2>
             <span className="text-xs text-[var(--muted)]">{roster.athletes.length}</span>
           </header>
           <div className="flex flex-wrap gap-3">
-            {roster.athletes.map((athlete) => (
+            {roster.athletes.map((athlete, athleteIdx) => (
               <div
                 key={athlete.id}
+                data-tour={
+                  rosterIdx === 0 && athleteIdx === 0 ? "athlete-card" : undefined
+                }
                 className="athlete-card w-64 shrink-0"
                 style={{ transform: "scale(0)" }}
               >

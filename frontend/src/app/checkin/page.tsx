@@ -1,5 +1,7 @@
 "use client";
 
+import { LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 type PainLevel = 1 | 2 | 3 | 4 | 5;
@@ -47,6 +49,7 @@ type Result = {
 };
 
 export default function CheckinPage() {
+  const router = useRouter();
   const [description, setDescription] = useState("");
   const [parts, setParts] = useState<string[]>([]);
   const [pain, setPain] = useState<PainLevel | null>(null);
@@ -83,7 +86,18 @@ export default function CheckinPage() {
   const canSubmit = description.trim().length > 0 || parts.length > 0;
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="min-h-screen px-6 py-8 sm:px-10">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="mb-6 flex justify-end">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+          >
+            <LogOut className="size-3.5" />
+            Log out
+          </button>
+        </div>
       <header className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           How are you feeling?
@@ -248,6 +262,7 @@ export default function CheckinPage() {
           </div>
         </form>
       )}
+      </div>
     </div>
   );
 }

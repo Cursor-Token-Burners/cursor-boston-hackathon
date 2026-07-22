@@ -46,7 +46,10 @@ export default async function AthletePage({
       </Link>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+        <section
+          data-tour="silhouette"
+          className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+        >
           <div className="aspect-[4/5] w-full sm:aspect-[16/10] lg:aspect-auto lg:h-[640px]">
             <AthleteSilhouette body={body} stats={stats} accent={accent} />
           </div>
@@ -73,7 +76,7 @@ export default async function AthletePage({
           </div>
         </section>
 
-        <aside className="flex flex-col gap-4">
+        <aside data-tour="stats" className="flex flex-col gap-4">
           <StatGroup title="Body" accent={accent}>
             <StatRow label="Sex" value={body.sex === "M" ? "Male" : "Female"} />
             <StatRow label="Height" value={`${body.height} cm`} />
